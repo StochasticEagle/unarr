@@ -39,6 +39,7 @@ static bool zip_parse_local_entry(ar_archive *ar, off64_t offset)
     }
     ar->entry_size_uncompressed = (size_t)entry.uncompressed;
     ar->entry_filetime = ar_conv_dosdate_to_filetime(entry.dosdate);
+    ar->entry_is_directory = false;
 
     zip->entry.offset = offset;
     zip->entry.method = entry.method;
@@ -58,10 +59,10 @@ static bool zip_parse_local_entry(ar_archive *ar, off64_t offset)
     if (entry.datasize == 0 && ar_entry_get_name(ar) &&
           zip->entry.name != NULL && *zip->entry.name &&
           zip->entry.name[strlen(zip->entry.name) - 1] == '/') {
-        log("Skipping directory entry \"%s\"", zip->entry.name);
-        return zip_parse_local_entry(ar, ar->entry_offset_next);
+        ar->entry_is_directory = true;
+        ar->entry_size_uncompressed = 0;
     }
-    if (entry.datasize == 0 && entry.uncompressed == 0 && (entry.flags & (1 << 3))) {
+    if (!ar->entry_is_directory && entry.datasize == 0 && entry.uncompressed == 0 && (entry.flags & (1 << 3))) {
         warn("Deferring sizes to data descriptor isn't supported");
         ar->entry_size_uncompressed = 1;
     }
@@ -91,6 +92,7 @@ static bool zip_parse_entry(ar_archive *ar, off64_t offset)
     ar->entry_offset_next = offset + ZIP_DIR_ENTRY_FIXED_SIZE + entry.namelen + entry.extralen + entry.commentlen;
     ar->entry_size_uncompressed = (size_t)entry.uncompressed;
     ar->entry_filetime = ar_conv_dosdate_to_filetime(entry.dosdate);
+    ar->entry_is_directory = false;
 
     zip->entry.offset = entry.header_offset;
     zip->entry.method = entry.method;
@@ -108,8 +110,8 @@ static bool zip_parse_entry(ar_archive *ar, off64_t offset)
     zip_clear_uncompress(&zip->uncomp);
 
     if (entry.datasize == 0 && ((entry.version >> 8) == 0 || (entry.version >> 8) == 3) && (entry.attr_external & 0x40000010)) {
-        log("Skipping directory entry \"%s\"", zip_get_name(ar, false));
-        return zip_parse_entry(ar, ar->entry_offset_next);
+        ar->entry_is_directory = true;
+        ar->entry_size_uncompressed = 0;
     }
 
     return true;

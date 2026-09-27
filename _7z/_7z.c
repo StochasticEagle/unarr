@@ -66,7 +66,8 @@ static bool _7z_parse_entry(ar_archive *ar, off64_t offset)
 
     ar->entry_offset = offset;
     ar->entry_offset_next = offset + 1;
-    ar->entry_size_uncompressed = (size_t)SzArEx_GetFileSize(&_7z->data, offset);
+    ar->entry_is_directory = SzArEx_IsDir(&_7z->data, offset);
+    ar->entry_size_uncompressed = ar->entry_is_directory ? 0 : (size_t)SzArEx_GetFileSize(&_7z->data, offset);
     ar->entry_filetime = SzBitWithVals_Check(&_7z->data.MTime, offset) ?
                           (time64_t)(_7z->data.MTime.Vals[offset].Low |
                           ((time64_t)_7z->data.MTime.Vals[offset].High << 32))
@@ -74,11 +75,6 @@ static bool _7z_parse_entry(ar_archive *ar, off64_t offset)
     free(_7z->entry_name);
     _7z->entry_name = NULL;
     _7z->uncomp.initialized = false;
-
-    if (SzArEx_IsDir(&_7z->data, offset)) {
-        log("Skipping directory entry \"%s\"", _7z_get_name(ar, false));
-        return _7z_parse_entry(ar, offset + 1);
-    }
 
     return true;
 }
@@ -154,7 +150,7 @@ static bool _7z_uncompress(ar_archive *ar, void *buffer, size_t buffer_size)
     return true;
 }
 
-ar_archive *ar_open_7z_archive(ar_stream *stream)
+ar_archive *ar_open_7z_archive(ar_stream *stream, size_t buffer_size)
 {
     ar_archive *ar;
     ar_archive_7z *_7z;
@@ -162,6 +158,8 @@ ar_archive *ar_open_7z_archive(ar_stream *stream)
 
     if (!ar_seek(stream, 0, SEEK_SET))
         return NULL;
+    if (buffer_size == 0)
+        buffer_size = AR_7Z_DEFAULT_BUFFER_SIZE;
 
     ar = ar_open_archive(stream, sizeof(ar_archive_7z), _7z_close, _7z_parse_entry, _7z_get_name, _7z_uncompress, NULL, 0);
     if (!ar)
@@ -171,8 +169,12 @@ ar_archive *ar_open_7z_archive(ar_stream *stream)
     CSeekStream_CreateVTable(&_7z->in_stream, stream);
     LookToRead2_CreateVTable(&_7z->look_stream, False);
     _7z->look_stream.realStream = &_7z->in_stream.super;
-    _7z->look_stream.buf = ISzAlloc_Alloc(&gSzAlloc, 1 << 18);
-    _7z->look_stream.bufSize = 1 << 18;
+    _7z->look_stream.buf = ISzAlloc_Alloc(&gSzAlloc, buffer_size);
+    if (!_7z->look_stream.buf) {
+        free(ar);
+        return NULL;
+    }
+    _7z->look_stream.bufSize = buffer_size;
     LookToRead2_INIT(&_7z->look_stream);
 
 
@@ -195,9 +197,10 @@ ar_archive *ar_open_7z_archive(ar_stream *stream)
 
 #else
 
-ar_archive *ar_open_7z_archive(ar_stream *stream)
+ar_archive *ar_open_7z_archive(ar_stream *stream, size_t buffer_size)
 {
     (void)stream;
+    (void)buffer_size;
     warn("7z support requires 7z SDK (define HAVE_7Z)");
     return NULL;
 }

@@ -48,13 +48,20 @@ bool ar_at_eof(ar_archive *ar)
 
 bool ar_parse_entry(ar_archive *ar)
 {
-    return ar->parse_entry(ar, ar->entry_offset_next);
+    bool result = ar->parse_entry(ar, ar->entry_offset_next);
+    if (result)
+        ar->entry_position = 0;
+    return result;
 }
 
 bool ar_parse_entry_at(ar_archive *ar, off64_t offset)
 {
+    bool result;
     ar->at_eof = false;
-    return ar->parse_entry(ar, offset ? offset : ar->entry_offset_first);
+    result = ar->parse_entry(ar, offset ? offset : ar->entry_offset_first);
+    if (result)
+        ar->entry_position = 0;
+    return result;
 }
 
 bool ar_parse_entry_for(ar_archive *ar, const char *entry_name)
@@ -92,6 +99,11 @@ size_t ar_entry_get_size(ar_archive *ar)
     return ar->entry_size_uncompressed;
 }
 
+bool ar_entry_is_directory(ar_archive *ar)
+{
+    return ar->entry_is_directory;
+}
+
 time64_t ar_entry_get_filetime(ar_archive *ar)
 {
     return ar->entry_filetime;
@@ -99,7 +111,66 @@ time64_t ar_entry_get_filetime(ar_archive *ar)
 
 bool ar_entry_uncompress(ar_archive *ar, void *buffer, size_t count)
 {
+    if (ar->entry_is_directory)
+        return count == 0;
     return ar->uncompress(ar, buffer, count);
+}
+
+size_t ar_entry_read(ar_archive *ar, void *buffer, size_t count)
+{
+    size_t remaining;
+    if (!ar || (!buffer && count) || ar->entry_position > ar->entry_size_uncompressed)
+        return 0;
+    remaining = ar->entry_size_uncompressed - ar->entry_position;
+    if (count > remaining)
+        count = remaining;
+    if (!count)
+        return 0;
+    if (!ar->uncompress(ar, buffer, count))
+        return 0;
+    ar->entry_position += count;
+    return count;
+}
+
+bool ar_entry_seek(ar_archive *ar, off64_t offset, int origin)
+{
+    off64_t target;
+    unsigned char discard[4096];
+    if (!ar)
+        return false;
+    if (origin == SEEK_SET)
+        target = offset;
+    else if (origin == SEEK_CUR)
+        target = (off64_t)ar->entry_position + offset;
+    else if (origin == SEEK_END)
+        target = (off64_t)ar->entry_size_uncompressed + offset;
+    else
+        return false;
+    if (target < 0 || (uint64_t)target > (uint64_t)ar->entry_size_uncompressed)
+        return false;
+    if ((size_t)target < ar->entry_position) {
+        off64_t entry_offset = ar->entry_offset;
+        if (!ar_parse_entry_at(ar, entry_offset) || ar->entry_offset != entry_offset)
+            return false;
+    }
+    while (ar->entry_position < (size_t)target) {
+        size_t count = (size_t)target - ar->entry_position;
+        if (count > sizeof(discard))
+            count = sizeof(discard);
+        if (ar_entry_read(ar, discard, count) != count)
+            return false;
+    }
+    return true;
+}
+
+off64_t ar_entry_tell(ar_archive *ar)
+{
+    return ar ? (off64_t)ar->entry_position : -1;
+}
+
+size_t ar_entry_size(ar_archive *ar)
+{
+    return ar ? ar->entry_size_uncompressed : 0;
 }
 
 size_t ar_get_global_comment(ar_archive *ar, void *buffer, size_t count)

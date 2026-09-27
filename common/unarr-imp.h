@@ -27,11 +27,6 @@ uint32_t ar_crc32(uint32_t crc32, const unsigned char *data, size_t data_len);
 
 /***** stream *****/
 
-typedef void (* ar_stream_close_fn)(void *data);
-typedef size_t (* ar_stream_read_fn)(void *data, void *buffer, size_t count);
-typedef bool (* ar_stream_seek_fn)(void *data, off64_t offset, int origin);
-typedef off64_t (* ar_stream_tell_fn)(void *data);
-
 struct ar_stream_s {
     ar_stream_close_fn close;
     ar_stream_read_fn read;
@@ -70,11 +65,13 @@ struct ar_archive_s {
 
     ar_stream *stream;
     bool at_eof;
+    bool entry_is_directory;
     off64_t entry_offset;
     off64_t entry_offset_first;
     off64_t entry_offset_next;
     size_t entry_size_uncompressed;
     time64_t entry_filetime;
+    size_t entry_position;
 };
 
 ar_archive *ar_open_archive(ar_stream *stream, size_t struct_size, ar_archive_close_fn close, ar_parse_entry_fn parse_entry,

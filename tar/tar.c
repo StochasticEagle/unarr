@@ -30,19 +30,17 @@ static bool tar_parse_entry(ar_archive *ar, off64_t offset)
     ar->entry_offset_next = offset + TAR_BLOCK_SIZE + (tar->entry.filesize + TAR_BLOCK_SIZE - 1) / TAR_BLOCK_SIZE * TAR_BLOCK_SIZE;
     ar->entry_size_uncompressed = tar->entry.filesize;
     ar->entry_filetime = tar->entry.mtime;
+    ar->entry_is_directory = false;
     tar->bytes_done = 0;
-
-    if (tar->last_seen_dir > offset)
-        tar->last_seen_dir = 0;
 
     switch (tar->entry.filetype) {
     case TYPE_FILE:
     case TYPE_FILE_OLD:
         return true;
     case TYPE_DIRECTORY:
-        log("Skipping directory entry \"%s\"", tar_get_name(ar, false));
-        tar->last_seen_dir = ar->entry_offset;
-        return tar_parse_entry(ar, ar->entry_offset_next);
+        ar->entry_is_directory = true;
+        ar->entry_size_uncompressed = 0;
+        return true;
     case TYPE_PAX_GLOBAL:
         log("Skipping PAX global extended header record");
         return tar_parse_entry(ar, ar->entry_offset_next);

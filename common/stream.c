@@ -3,7 +3,7 @@
 
 #include "unarr-imp.h"
 
-ar_stream *ar_open_stream(void *data, ar_stream_close_fn close, ar_stream_read_fn read, ar_stream_seek_fn seek, ar_stream_tell_fn tell)
+UNARR_EXPORT ar_stream *ar_open_stream(void *data, ar_stream_close_fn close, ar_stream_read_fn read, ar_stream_seek_fn seek, ar_stream_tell_fn tell)
 {
     ar_stream *stream = malloc(sizeof(ar_stream));
     if (!stream) {

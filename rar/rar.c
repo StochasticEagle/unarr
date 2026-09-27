@@ -25,6 +25,7 @@ static bool rar_parse_entry(ar_archive *ar, off64_t offset)
     for (;;) {
         ar->entry_offset = ar_tell(ar->stream);
         ar->entry_size_uncompressed = 0;
+        ar->entry_is_directory = false;
 
         if (!rar_parse_header(ar, &header))
             return false;
@@ -61,15 +62,13 @@ static bool rar_parse_entry(ar_archive *ar, off64_t offset)
             if ((header.flags & LHD_PASSWORD))
                 warn("Encrypted entries will fail to uncompress");
             if ((header.flags & LHD_DIRECTORY) == LHD_DIRECTORY) {
-                if (header.datasize == 0) {
-                    log("Skipping directory entry \"%s\"", rar_get_name(ar, false));
-                    break;
-                }
-                warn("Can't skip directory entries containing data");
+                ar->entry_is_directory = true;
+                if (header.datasize != 0)
+                    warn("Directory entry contains data");
             }
             if ((header.flags & (LHD_SPLIT_BEFORE | LHD_SPLIT_AFTER)))
                 warn("Splitting files isn't really supported");
-            ar->entry_size_uncompressed = (size_t)entry.size;
+            ar->entry_size_uncompressed = ar->entry_is_directory ? 0 : (size_t)entry.size;
             ar->entry_filetime = ar_conv_dosdate_to_filetime(entry.dosdate);
             if (!rar->entry.solid || rar->entry.method == METHOD_STORE || out_of_order) {
                 rar_clear_uncompress(&rar->uncomp);
