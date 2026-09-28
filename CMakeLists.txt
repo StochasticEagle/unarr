@@ -95,15 +95,17 @@ add_library(
   lzmasdk/Ppmd7Dec.c
   lzmasdk/Ppmd7aDec.c
   lzmasdk/Ppmd8Dec.c
-  rar/lzss.h
   rar/rar.h
-  rar/rarvm.h
-  rar/filter-rar.c
-  rar/uncompress-rar.c
-  rar/huffman-rar.c
   rar/rar.c
-  rar/rarvm.c
-  rar/parse-rar.c
+  rar/rar4/lzss.h
+  rar/rar4/rar.h
+  rar/rar4/rarvm.h
+  rar/rar4/filter-rar.c
+  rar/rar4/uncompress-rar.c
+  rar/rar4/huffman-rar.c
+  rar/rar4/rar.c
+  rar/rar4/rarvm.c
+  rar/rar4/parse-rar.c
   tar/tar.h
   tar/parse-tar.c
   tar/tar.c

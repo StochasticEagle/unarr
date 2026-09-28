@@ -4,7 +4,7 @@
 /* adapted from https://code.google.com/p/theunarchiver/source/browse/XADMaster/RARVirtualMachine.c */
 
 #include "rarvm.h"
-#include "../common/allocator.h"
+#include "../../common/allocator.h"
 
 #include <stdlib.h>
 #include <string.h>
